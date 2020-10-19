@@ -11,7 +11,7 @@
 # Imports
 import numpy as np
 from PlotFunctions import *
-
+import pdb
 
 ############################################################
 # functions
@@ -97,7 +97,7 @@ def ExtractLines(RangeData, params):
 
 def SplitLinesRecursive(theta, rho, startIdx, endIdx, params):
     '''
-    This function executes a recursive line-slitting algorithm, which
+    This function executes a recursive line-splitting algorithm, which
     recursively sub-divides line segments until no further splitting is
     required.
 
@@ -116,7 +116,21 @@ def SplitLinesRecursive(theta, rho, startIdx, endIdx, params):
     HINT: Call FindSplit() to find an index to split at.
     '''
     ########## Code starts here ##########
+    temp_alpha, temp_r = FitLine(theta[startIdx:endIdx], rho[startIdx:endIdx])
 
+    if (endIdx - startIdx) <= params['MIN_POINTS_PER_SEGMENT'] :
+        return np.array([temp_alpha]), np.array([temp_r]), np.array([[startIdx, endIdx]])
+
+    s = FindSplit(theta[startIdx:endIdx], rho[startIdx:endIdx], temp_alpha, temp_r, params)
+    if s == -1:
+        return np.array([temp_alpha]), np.array([temp_r]), np.array([[startIdx, endIdx]])
+
+    alpha1, r1, idx1 = SplitLinesRecursive(theta, rho, startIdx, startIdx + s, params)
+    alpha2, r2, idx2 = SplitLinesRecursive(theta, rho, startIdx + s, endIdx, params)
+
+    alpha = np.concatenate((alpha1, alpha2)) 
+    r = np.concatenate((r1, r2))
+    idx = np.concatenate((idx1, idx2))
     ########## Code ends here ##########
     return alpha, r, idx
 
@@ -140,7 +154,19 @@ def FindSplit(theta, rho, alpha, r, params):
         splitIdx: idx at which to split line (return -1 if it cannot be split).
     '''
     ########## Code starts here ##########
-
+    d = np.absolute(rho*np.cos((theta-alpha))-r) #create array of distances of each point to line segment
+    while True:
+        max_dist_index = np.argmax(d)
+        max_distance = max(d)
+        if max_distance == 0:
+            splitIdx = -1
+            break
+        min_segment_length = min(np.size(d[0:max_dist_index]), np.size(d[max_dist_index:]))
+        if max_distance > params['LINE_POINT_DIST_THRESHOLD'] and min_segment_length > params['MIN_POINTS_PER_SEGMENT']:
+            splitIdx = max_dist_index
+            break
+        
+        d[max_dist_index] = 0 # change to zero to move to next largest value
     ########## Code ends here ##########
     return splitIdx
 
@@ -157,7 +183,21 @@ def FitLine(theta, rho):
         r: 'r' of best fit for range data (1 number) (m).
     '''
     ########## Code starts here ##########
+    n = theta.size
+    # for alpha:
+    rho_sqd = rho**2
+    sin_twotheta = np.sin((2*theta))
+    cos_twotheta = np.cos((2*theta))
 
+    first_term = np.sum(np.multiply(rho_sqd, sin_twotheta))
+    second_term = (2.0/n)*np.sum(rho[i]*rho[j]*np.cos(theta[i])*np.sin(theta[j]) for i in range(n) for j in range(n))
+    third_term = np.sum(np.multiply(rho_sqd, cos_twotheta))
+    fourth_term = (1.0/n)*np.sum(rho[i]*rho[j]*np.cos((theta[i]+theta[j])) for i in range(n) for j in range(n))
+
+    alpha = .5*np.arctan2((first_term - second_term),(third_term - fourth_term)) + (np.pi/2)
+
+    # for r
+    r = (1.0/n)*np.sum(np.multiply(rho,np.cos((theta-alpha))))
     ########## Code ends here ##########
     return alpha, r
 
@@ -183,7 +223,37 @@ def MergeColinearNeigbors(theta, rho, alpha, r, pointIdx, params):
           merge. If it can be split, do not merge.
     '''
     ########## Code starts here ##########
+    last_num_segs = 0
+    alphaOut = alpha
+    rOut = r
+    pointIdxOut = pointIdx
 
+    while True:
+        num_segs = rOut.size
+        if num_segs == last_num_segs:
+            break
+        for curr_seg_idx in range((num_segs-1)):
+            next_seg_idx = curr_seg_idx + 1
+            start = pointIdx[curr_seg_idx][0]
+            end = pointIdx[next_seg_idx][1]
+            new_theta = theta[start:end]
+            new_rho = rho[start:end]
+            new_alpha, new_r = FitLine(new_theta, new_rho)
+
+            splitIdx = FindSplit(new_theta, new_rho, new_alpha, new_r, params)
+            if splitIdx != -1:
+                # adjust line segment collection
+                alphaOut[curr_seg_idx] = new_alpha
+                rOut[curr_seg_idx] = new_r
+                pointIdxOut[curr_seg_idx,:] = np.array([[start, end]])
+                # remove the neighbor that has been merged
+                alphaOut = np.delete(alphaOut, next_seg_idx)
+                rOut = np.delete(rOut, next_seg_idx)
+                pointIdxOut = np.delete(pointIdxOut, next_seg_idx,0)
+                break
+
+        last_num_segs = num_segs
+    
     ########## Code ends here ##########
     return alphaOut, rOut, pointIdxOut
 
