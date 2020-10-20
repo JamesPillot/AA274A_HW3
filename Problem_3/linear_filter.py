@@ -16,40 +16,27 @@ def corr(F, I):
         G: An (m, n)-shaped ndarray containing the correlation of the filter with the image.
     """
     ########## Code starts here ##########
-    # Build t_ij vector
-    def I_vec(i,j):
-        I_top = np.atleast_2d(paddedI[i,j,:])
-        I_middle = np.atleast_2d(paddedI[i,(j+1):,0])
-        I_bottom = np.atleast_2d(paddedI[(i+1):,j,0])
-        newI = np.transpose(np.hstack([I_top, I_middle, I_bottom]))
-        return newI
-
+    k  = F.shape[0]
+    ell = F.shape[1]
+    c = F.shape[2]
+    
     # Zero padding I
     c = I.shape[2]
     n = I.shape[1]
     m = I.shape[0]
-    pad_sides = int(np.floor((n/2)))
-    pad_topBotom = int(np.floor((m/2)))
+    pad_sides = int(np.floor((k/2)))
+    pad_topBotom = int(np.floor((ell/2)))
     paddedI = np.zeros((m+2*pad_topBotom, n+2*pad_sides, c))
     for chan in range(c):
-        top_row =  np.zeros((pad_topBotom,(2*pad_sides) + n))
+        top_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
         mid_row = np.block([[np.zeros((m,pad_sides)), I[:,:,chan], np.zeros((m,pad_sides))]])
         bottom_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
         paddedI[:,:,chan] = np.vstack((top_row, mid_row, bottom_row))
-
-     # Build F vector
-    F_top = np.atleast_2d(F[0,0,:])
-    F_middle = np.atleast_2d(F[0,1:,0])
-    F_bottom = np.atleast_2d(F[1:,0,0])
-    newF = np.transpose(np.hstack([F_top, F_middle, F_bottom]))
     
     G = np.zeros((m,n))
     for row in range(m):
         for col in range(n):
-            temp = np.dot(newF,I_vec(row,col))
-            pdb.set_trace()
-
-            # G[row, col] = 
+            G[row, col] = np.dot(F.flatten(), paddedI[row:row+k, col:col+k, :].flatten())
     return G
     ########## Code ends here ##########
 
@@ -64,39 +51,27 @@ def norm_cross_corr(F, I):
         G: An (m, n)-shaped ndarray containing the normalized cross-correlation of the filter with the image.
     """
     ########## Code starts here ##########
-    # Build t_ij vector
-    def I_vec(i,j):
-        I_top = np.atleast_2d(paddedI[i,j,:])
-        I_middle = np.atleast_2d(paddedI[i,(j+1):,0])
-        I_bottom = np.atleast_2d(paddedI[(i+1):,j,0])
-        newI = np.transpose(np.hstack([I_top, I_middle, I_bottom]))
-        return newI
-
+    k  = F.shape[0]
+    ell = F.shape[1]
+    c = F.shape[2]
+    
     # Zero padding I
     c = I.shape[2]
     n = I.shape[1]
     m = I.shape[0]
-    pad_sides = int(np.floor((n/2)))
-    pad_topBotom = int(np.floor((m/2)))
+    pad_sides = int(np.floor((k/2)))
+    pad_topBotom = int(np.floor((ell/2)))
     paddedI = np.zeros((m+2*pad_topBotom, n+2*pad_sides, c))
     for chan in range(c):
-        top_row =  np.zeros((pad_topBotom,(2*pad_sides) + n))
+        top_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
         mid_row = np.block([[np.zeros((m,pad_sides)), I[:,:,chan], np.zeros((m,pad_sides))]])
         bottom_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
-        pdb.set_trace()
-
         paddedI[:,:,chan] = np.vstack((top_row, mid_row, bottom_row))
-
-     # Build F vector
-    F_top = np.atleast_2d(F[0,0,:])
-    F_middle = np.atleast_2d(F[0,1:,0])
-    F_bottom = np.atleast_2d(F[1:,0,0])
-    F = np.transpose(np.hstack([F_top, F_middle, F_bottom]))
     
     G = np.zeros((m,n))
     for row in range(m):
         for col in range(n):
-            G[row,col] = np.inner(F,I_vec(row,col)) / (np.linalg.norm(F)*np.linalg.norm(I_vec(row,col)))
+            G[row, col] = np.dot(F.flatten(), paddedI[row:row+k, col:col+k, :].flatten()) / (np.linalg.norm(F.flatten())*np.linalg.norm(paddedI[row:row+k, col:col+k, :].flatten()))
     return G
     ########## Code ends here ##########
 
