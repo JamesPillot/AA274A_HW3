@@ -33,11 +33,10 @@ def corr(F, I):
         bottom_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
         paddedI[:,:,chan] = np.vstack((top_row, mid_row, bottom_row))
     
-    testI = np.pad(I, [(k//2, k//2), (ell//2, ell//2), (0,0)], 'constant', constant_values = [(0,0),(0,0),(0,0)])
     G = np.zeros((m,n))
     for row in range(m):
         for col in range(n):
-            G[row, col] = np.dot(F.flatten(), testI[row:row+k, col:col+k, :].flatten())
+            G[row, col] = np.dot(F.flatten(), paddedI[row:row+k, col:col+k, :].flatten())
     return G
     ########## Code ends here ##########
 
