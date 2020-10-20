@@ -162,7 +162,7 @@ def FindSplit(theta, rho, alpha, r, params):
             splitIdx = -1
             break
         min_segment_length = min(np.size(d[0:max_dist_index]), np.size(d[max_dist_index:]))
-        if max_distance > params['LINE_POINT_DIST_THRESHOLD'] and min_segment_length > params['MIN_POINTS_PER_SEGMENT']:
+        if max_distance >= params['LINE_POINT_DIST_THRESHOLD'] and min_segment_length >= params['MIN_POINTS_PER_SEGMENT']:
             splitIdx = max_dist_index
             break
         
