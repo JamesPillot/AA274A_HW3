@@ -241,7 +241,7 @@ def MergeColinearNeigbors(theta, rho, alpha, r, pointIdx, params):
             new_alpha, new_r = FitLine(new_theta, new_rho)
 
             splitIdx = FindSplit(new_theta, new_rho, new_alpha, new_r, params)
-            if splitIdx != -1:
+            if splitIdx == -1:
                 # adjust line segment collection
                 alphaOut[curr_seg_idx] = new_alpha
                 rOut[curr_seg_idx] = new_r
@@ -276,7 +276,7 @@ def ImportRangeData(filename):
 ############################################################
 def main():
     # parameters for line extraction (mess with these!)
-    MIN_SEG_LENGTH = 0.005  # minimum length of each line segment (m)
+    MIN_SEG_LENGTH = 0.05  # minimum length of each line segment (m)
     LINE_POINT_DIST_THRESHOLD = 0.02  # max distance of pt from line to split
     MIN_POINTS_PER_SEGMENT = 4  # minimum number of points per line segment
     MAX_P2P_DIST = 1.0  # max distance between two adjent pts within a segment
