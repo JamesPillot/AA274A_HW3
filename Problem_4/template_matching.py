@@ -4,7 +4,7 @@ import numpy as np
 import time
 import cv2
 import matplotlib.pyplot as plt
-
+import pdb
 
 def template_match(template, image, threshold=0.999):
     """
@@ -17,7 +17,18 @@ def template_match(template, image, threshold=0.999):
         matches: A list of (top-left y, top-left x, bounding box height, bounding box width) tuples for each match's bounding box.
     """
     ########## Code starts here ##########
-    raise NotImplementedError("Implement me!")
+    w = template.shape[1]
+    h = template.shape[0]
+    
+    matches = []
+    result = cv2.matchTemplate(image, template, cv2.TM_CCORR_NORMED)
+    thresh_met = np.argwhere((result >= threshold))
+    pdb.set_trace()
+    for i in range(len(thresh_met)):
+        x = thresh_met[i][0]
+        y = thresh_met[i][1]
+        matches.append((y,x,h,w))
+    return matches
     ########## Code ends here ##########
 
 
