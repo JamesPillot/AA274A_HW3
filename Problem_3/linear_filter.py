@@ -24,6 +24,7 @@ def corr(F, I):
     c = I.shape[2]
     n = I.shape[1]
     m = I.shape[0]
+
     # Originally used this route to build paddedI but was running into a small dimension error (off by less than 10 or so)
 
     # pad_sides = int(np.floor((k/2)))
@@ -37,6 +38,7 @@ def corr(F, I):
     
     # Consulted with my group partner Sophia Williams who suggested I use np.pad function to get this version of paddedI
     paddedI = np.pad(I, [(k//2,k//2),(ell//2,ell//2), (0,0)], 'constant', constant_values = [(0,0),(0,0),(0,0)])
+
     G = np.zeros((m,n))
     for row in range(m):
         for col in range(n):

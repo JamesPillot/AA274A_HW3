@@ -23,11 +23,10 @@ def template_match(template, image, threshold=0.999):
     matches = []
     result = cv2.matchTemplate(image, template, cv2.TM_CCORR_NORMED)
     thresh_met = np.argwhere((result >= threshold))
-    pdb.set_trace()
     for i in range(len(thresh_met)):
         x = thresh_met[i][0]
         y = thresh_met[i][1]
-        matches.append((y,x,h,w))
+        matches.append((x,y,h,w))
     return matches
     ########## Code ends here ##########
 
