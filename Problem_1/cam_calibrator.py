@@ -71,7 +71,31 @@ class CameraCalibrator:
         HINT: it does not matter where your frame it, as long as you are consistent!
         '''
         ########## Code starts here ##########
+        # Board dimensions
+        N_cols = 9
+        M_rows = 7
 
+        # Xg and Yg will be list of np arrays 
+        Xg = []
+        Yg = []
+
+        # Go through each board
+        for curr_board_u in u_meas:
+            x = []
+            y = []
+            
+            # Populate x and y arrays (created as lists and then converted later)
+            for index in range(np.size(curr_board_u)):
+                xval = (index % N_cols) * self.d_square
+                x.append(xval)
+                yval = np.floor((index / N_cols)) * self.d_square
+                y.append(yval)
+	
+            # Update Xg and Yg 
+            Xg.append(np.array(x))
+            Yg.append(np.array(y))
+
+        corner_coordinates = (Xg, Yg)
         ########## Code ends here ##########
         return corner_coordinates
 
@@ -91,6 +115,35 @@ class CameraCalibrator:
         '''
         ########## Code starts here ##########
 
+        # Start with building P_tilde
+        sizeX  = np.size(X) # dimension of X "dim(X)" which is also dim(Y) = dim(u_meas) = dim(v_meas)
+
+        onesvec = np.ones(sizeX) # vector of ones for homogeneus representation of world coordinates
+        Ph_w = np.array([X, Y, onesvec], dtype = 'float' ) 
+
+        P_tilde_list = []
+        for col in range(Ph_w.shape[1]):
+            Ph_w_i = Ph_w[:,col]
+	    Ph_w_i.shape = (3,1)
+            Ph_w_i_t = np.transpose(Ph_w_i) # homogeneus world coordinate i transposed
+            # Build block of Ptilde
+            zeroesvec = np.zeros((1, np.size(Ph_w_i)))
+            block = np.block([
+                [Ph_w_i_t, zeroesvec, -u_meas[col]*Ph_w_i_t], # col is also current index of umeas and vmeas
+                [zeroesvec, Ph_w_i_t, -v_meas[col]*Ph_w_i_t]
+            ])
+            P_tilde_list.append(block)
+
+        P_tilde = np.vstack(P_tilde_list) #finally build P_tilde from list of blocks
+
+        # Now use SVD to solve constrained least squares problem and get satisfactory m
+        u, s, vh = np.linalg.svd(P_tilde)
+        m = vh[-1,:] # m is first row of Vh (this gives us vh_1 which is what we want)
+        m1 = m[0:3] # first column of H
+        m2 = m[3:6] # second column of H
+        m3 = m[6:9] # third column of H
+
+        H = np.vstack((m1,m2,m3))
         ########## Code ends here ##########
         return H
 
@@ -108,6 +161,55 @@ class CameraCalibrator:
         '''
         ########## Code starts here ##########
 
+        # define inner function to calculate V for each Homography matrix in list H
+        def calcV(i,j,currH):
+
+	    
+            first_entry = currH[0,i]*currH[0,j]
+            second_entry = currH[0,i]*currH[1,j] + currH[1,i]*currH[0,j]
+            third_entry = currH[1,i]*currH[1,j]
+            fourth_entry = currH[2,i]*currH[0,j] + currH[0,i]*currH[2,j]
+            fifth_entry = currH[2,i]*currH[1,j] + currH[1,i]*currH[2,j]
+            sixth_entry = currH[2,i]*currH[2,j]
+
+            v_ij_t = np.array([[first_entry, second_entry, third_entry, fourth_entry, fifth_entry, sixth_entry]], dtype = 'float')
+            return v_ij_t
+        
+        V_list = []
+        for curH in H:
+            v_onetwo_t = calcV(0,1, curH)
+            v_oneone_minus_v_twotwo_t = calcV(0,0,curH) - calcV(1,1,curH)
+            cur_image_v = np.vstack((v_onetwo_t, v_oneone_minus_v_twotwo_t))
+            V_list.append(cur_image_v)
+        
+        V = np.vstack(V_list)
+        V = V.astype('float')
+
+        # Now use SVD to solve another constrained least squares and get satisfactory b
+        u, s, vh = np.linalg.svd(V)
+        b = vh[-1,:] # b is last row of Vh (this gives us smallest vh_1 which is what we want)
+	
+        # Finally use b to back out the parameters and fill out our matrix A
+        B11 = b[0]
+        B12 = b[1]
+        B22 = b[2]
+        B13 = b[3]
+        B23 = b[4]
+        B33 = b[5]
+        
+	v0 = (B12*B13 - B11*B23)/(B11*B22 - (B12**2))
+        lamb = B33 - (((B13**2) + v0*(B12*B13 - B11*B23))/(B11)) #lambda
+        alpha = np.sqrt((lamb/B11))
+        beta = np.sqrt((lamb*B11)/(B11*B22 - (B12**2)))
+        gamma = (-B12*(alpha**2)*beta)/lamb
+        u0 = ((gamma*v0)/beta) - ((B13*(alpha**2))/lamb)
+
+        A = np.array([
+            [alpha, gamma, u0],
+            [0, beta, v0],
+            [0, 0, 1]
+        ])
+
         ########## Code ends here ##########
         return A
 
@@ -121,6 +223,23 @@ class CameraCalibrator:
             t: the translation vector
         '''
         ########## Code starts here ##########
+        Ainv = np.linalg.inv(A)
+        h1 = H[:,0]
+        h2 = H[:,1]
+        h3 = H[:,2]
+        lamb1 = 1 / (np.linalg.norm(np.matmul(Ainv,h1))) #lambda1
+        lamb2 = 1/ (np.linalg.norm(np.matmul(Ainv,h2))) #lambda2
+
+        # Rotation matrix R
+        r1 = lamb1*np.matmul(Ainv, h1)
+        r2 = lamb1*np.matmul(Ainv, h2)
+        r3 = np.cross(r1, r2)
+        Q = np.array([r1, r2, r3]).T # build preliminary rotation matrix
+        u, s, vh = np.linalg.svd(Q) # use svd to estimate the best rotation matrix
+        R = np.matmul(u, vh)
+
+        # Translation vector t
+        t = lamb1*np.matmul(Ainv, h3)
 
         ########## Code ends here ##########
         return R, t
@@ -136,8 +255,19 @@ class CameraCalibrator:
 
         '''
         ########## Code starts here ##########
+        Pw = np.array([X, Y, Z], ndmin = 2)
+        Pc_list = []
+        for col in range(Pw.shape[1]):
+            Pw_i = Pw[:,col]
+            Pw_i.shape = (3,1)
+            Pc_i = t + np.matmul(R,Pw_i)
+            Pc_list.append(Pc_i)
+        
+        Pc = np.vstack(Pc_list)
 
-        ########## Code ends here ##########
+	x = Pc[:,0]
+        y = Pc[:,1]
+ 	######### Code ends here ##########
         return x, y
 
     def transformWorld2PixImageUndist(self, X, Y, Z, R, t, A):    # Zhang 2.1, Eq. (1)
@@ -151,7 +281,26 @@ class CameraCalibrator:
             u, v: the coordinates in the ideal pixel image plane
         '''
         ########## Code starts here ##########
+        Ph_w = np.array([X, Y, Z, np.ones(np.size(X))], ndmin = 2) #homogeneus world coordinates
 
+        t.shape = (3,1) #for block concatenation
+        rt_block = np.block([
+            [R, t]
+        ])
+        bigMatrix = np.matmul(A, rt_block)
+
+        ph_list = []
+        for col in range(Ph_w.shape[1]):
+            Ph_w_i = Ph_w[:,col]
+            Ph_w_i.shape = (4,1)
+            ph_i = np.matmul(bigMatrix, Ph_w_i)
+            ph_i.shape = (3,)
+            ph_list.append(ph_i)
+	    #pdb.set_trace()
+        
+        ph = np.vstack(ph_list)
+        u = ph[:,0]/ph[:,2]
+        v = ph[:,1]/ph[:,2]
         ########## Code ends here ##########
         return u, v
 
