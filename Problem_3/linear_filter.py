@@ -24,19 +24,23 @@ def corr(F, I):
     c = I.shape[2]
     n = I.shape[1]
     m = I.shape[0]
-    pad_sides = int(np.floor((k/2)))
-    pad_topBotom = int(np.floor((ell/2)))
-    paddedI = np.zeros((m+2*pad_topBotom, n+2*pad_sides, c))
-    for chan in range(c):
-        top_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
-        mid_row = np.block([[np.zeros((m,pad_sides)), I[:,:,chan], np.zeros((m,pad_sides))]])
-        bottom_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
-        paddedI[:,:,chan] = np.vstack((top_row, mid_row, bottom_row))
+    # Originally used this route to build paddedI but was running into a small dimension error (off by less than 10 or so)
+
+    # pad_sides = int(np.floor((k/2)))
+    # pad_topBotom = int(np.floor((ell/2)))
+    # paddedI = np.zeros((m+2*pad_topBotom, n+2*pad_sides, c))
+    # for chan in range(c):
+    #     top_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
+    #     mid_row = np.block([[np.zeros((m,pad_sides)), I[:,:,chan], np.zeros((m,pad_sides))]])
+    #     bottom_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
+    #     paddedI[:,:,chan] = np.vstack((top_row, mid_row, bottom_row))
     
+    # Consulted with my group partner Sophia Williams who suggested I use np.pad function to get this version of paddedI
+    paddedI = np.pad(I, [(k//2,k//2),(ell//2,ell//2), (0,0)], 'constant', constant_values = [(0,0),(0,0),(0,0)])
     G = np.zeros((m,n))
     for row in range(m):
         for col in range(n):
-            G[row, col] = np.dot(F.flatten(), paddedI[row:row+k, col:col+k, :].flatten())
+            G[row, col] = np.dot(F.flatten(), paddedI[row:row+k, col:col+ell, :].flatten())
     return G
     ########## Code ends here ##########
 
@@ -59,19 +63,12 @@ def norm_cross_corr(F, I):
     c = I.shape[2]
     n = I.shape[1]
     m = I.shape[0]
-    pad_sides = int(np.floor((k/2)))
-    pad_topBotom = int(np.floor((ell/2)))
-    paddedI = np.zeros((m+2*pad_topBotom, n+2*pad_sides, c))
-    for chan in range(c):
-        top_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
-        mid_row = np.block([[np.zeros((m,pad_sides)), I[:,:,chan], np.zeros((m,pad_sides))]])
-        bottom_row = np.zeros((pad_topBotom,(2*pad_sides) + n))
-        paddedI[:,:,chan] = np.vstack((top_row, mid_row, bottom_row))
-    
+    paddedI = np.pad(I, [(k//2,k//2),(ell//2,ell//2), (0,0)], 'constant', constant_values = [(0,0),(0,0),(0,0)])
+
     G = np.zeros((m,n))
     for row in range(m):
         for col in range(n):
-            G[row, col] = np.dot(F.flatten(), paddedI[row:row+k, col:col+k, :].flatten()) / (np.linalg.norm(F.flatten())*np.linalg.norm(paddedI[row:row+k, col:col+k, :].flatten()))
+            G[row, col] = np.dot(F.flatten(), paddedI[row:row+k, col:col+ell, :].flatten()) / (np.linalg.norm(F.flatten())*np.linalg.norm(paddedI[row:row+k, col:col+ell, :].flatten()))
     return G
     ########## Code ends here ##########
 
